@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-     <title>Crop Recommendation System</title>
+    <title>Precision Crop Management</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
     <div class="container">
-        <h2>🌱 Precision Crop Recommendation</h2>
+        <h2>🌱 Precision Crop Management System</h2>
 
         <form action="/predict" method="post">
+
             <label>Nitrogen (N)</label>
             <input type="number" name="N" step="any" required>
 
@@ -18,27 +20,44 @@
             <label>Potassium (K)</label>
             <input type="number" name="K" step="any" required>
 
-            <label>Temperature</label>
+            <label>Temperature (°C)</label>
             <input type="number" name="temperature" step="any" required>
 
-            <label>Humidity</label>
+            <label>Humidity (%)</label>
             <input type="number" name="humidity" step="any" required>
 
             <label>pH</label>
             <input type="number" name="ph" step="any" required>
 
-            <label>Rainfall</label>
+            <label>Rainfall (mm)</label>
             <input type="number" name="rainfall" step="any" required>
 
-            <button type="submit">Predict Crop</button>
+            <button type="submit">Predict</button>
         </form>
 
         {% if crop %}
-        <div class="result">
-            ✅ Recommended Crop: <b>{{ crop }}</b>
+        <div class="result crop">
+            🌾 <b>Recommended Crop:</b> {{ crop }}
+        </div>
+        {% endif %}
+
+        {% if fertilizer %}
+        <div class="result fertilizer">
+            🌿 <b>Fertilizer Advice:</b> {{ fertilizer }}
+        </div>
+        {% endif %}
+
+        {% if irrigation %}
+        <div class="result irrigation">
+            💧 <b>Irrigation Advice:</b> {{ irrigation }}
+        </div>
+        {% endif %}
+
+        {% if yield_estimate %}
+        <div class="result yield">
+            📊 <b>Expected Yield:</b> {{ yield_estimate }} tons/hectare
         </div>
         {% endif %}
     </div>
 </body>
-
 </html>
