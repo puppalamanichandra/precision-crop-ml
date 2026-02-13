@@ -1,11 +1,15 @@
 from flask import Flask, render_template, request
 import joblib
 import numpy as np
+import requests
 
 app = Flask(__name__)
 
-# Load trained ML model
+# Load ML model
 model = joblib.load("model/crop_model.pkl")
+
+# 🔑 WEATHER API KEY (PASTE YOUR KEY HERE)
+WEATHER_API_KEY = "72d6c804ff6841bddd44e4f1eecc2e90"
 
 @app.route("/")
 def home():
@@ -13,33 +17,46 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    # Get inputs
+
+    # 🔹 User inputs
     N = float(request.form["N"])
     P = float(request.form["P"])
     K = float(request.form["K"])
-    temperature = float(request.form["temperature"])
-    humidity = float(request.form["humidity"])
     ph = float(request.form["ph"])
     rainfall = float(request.form["rainfall"])
+    area = float(request.form["area"])  # farm area in hectares
 
-    # Crop Prediction
+    city = request.form["city"]
+
+    # 🌦 Fetch weather data
+    weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
+    weather_data = requests.get(weather_url).json()
+
+    temperature = weather_data["main"]["temp"]
+    humidity = weather_data["main"]["humidity"]
+
+    # 🌾 Crop prediction
     features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
     crop = model.predict(features)[0]
 
-    # 🌿 Fertilizer Recommendation
+    # 🌿 Fertilizer recommendation & amount
     if N < 50:
-        fertilizer = "Apply Nitrogen fertilizer (Urea)"
+        fertilizer = "Nitrogen (Urea)"
+        fert_amount = area * 50   # kg per hectare
     elif P < 30:
-        fertilizer = "Apply Phosphorus fertilizer (DAP)"
+        fertilizer = "Phosphorus (DAP)"
+        fert_amount = area * 40
     elif K < 30:
-        fertilizer = "Apply Potassium fertilizer (MOP)"
+        fertilizer = "Potassium (MOP)"
+        fert_amount = area * 30
     else:
-        fertilizer = "Soil nutrients are sufficient"
+        fertilizer = "No extra fertilizer needed"
+        fert_amount = 0
 
-    # 🌾 Yield Estimation (simple logic)
-    yield_estimate = round((rainfall * 0.02 + temperature * 0.1), 2)
+    # 🌾 Yield estimation
+    yield_estimate = round((rainfall * 0.02 + temperature * 0.15) * area, 2)
 
-    # 💧 Irrigation Recommendation
+    # 💧 Irrigation advice
     if rainfall < 50:
         irrigation = "High irrigation required"
     elif rainfall < 100:
@@ -51,8 +68,12 @@ def predict():
         "index.html",
         crop=crop,
         fertilizer=fertilizer,
+        fert_amount=fert_amount,
+        irrigation=irrigation,
         yield_estimate=yield_estimate,
-        irrigation=irrigation
+        temperature=temperature,
+        humidity=humidity,
+        N=N, P=P, K=K
     )
 
 if __name__ == "__main__":
