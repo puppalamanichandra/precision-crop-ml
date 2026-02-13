@@ -2,8 +2,15 @@
 <html>
 <head>
     <title>Precision Crop Management</title>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Leaflet Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 
 <body>
@@ -11,76 +18,97 @@
     <h2>🌱 Precision Crop Management System</h2>
 
     <form action="/predict" method="post">
+        <input type="text" name="city" placeholder="City" required>
+        <input type="number" name="area" placeholder="Farm Area (hectares)" step="any" required>
 
-        <label>City</label>
-        <input type="text" name="city" required>
+        <input type="number" name="N" placeholder="Nitrogen (N)" step="any" required>
+        <input type="number" name="P" placeholder="Phosphorus (P)" step="any" required>
+        <input type="number" name="K" placeholder="Potassium (K)" step="any" required>
 
-        <label>Farm Area (hectares)</label>
-        <input type="number" name="area" step="any" required>
-
-        <label>Nitrogen (N)</label>
-        <input type="number" name="N" step="any" required>
-
-        <label>Phosphorus (P)</label>
-        <input type="number" name="P" step="any" required>
-
-        <label>Potassium (K)</label>
-        <input type="number" name="K" step="any" required>
-
-        <label>pH</label>
-        <input type="number" name="ph" step="any" required>
-
-        <label>Rainfall (mm)</label>
-        <input type="number" name="rainfall" step="any" required>
+        <input type="number" name="ph" placeholder="Soil pH" step="any" required>
+        <input type="number" name="rainfall" placeholder="Rainfall (mm)" step="any" required>
 
         <button type="submit">Predict</button>
     </form>
 
     {% if crop %}
-    <div class="result crop">🌾 Crop: {{ crop }}</div>
-    <div class="result fertilizer">🌿 Fertilizer: {{ fertilizer }} ({{ fert_amount }} kg)</div>
-    <div class="result irrigation">💧 Irrigation: {{ irrigation }}</div>
-    <div class="result yield">📊 Expected Yield: {{ yield_estimate }} tons</div>
-    <div class="result">🌦 Temperature: {{ temperature }}°C | Humidity: {{ humidity }}%</div>
+    <div class="card">🌾 Crop: <b>{{ crop }}</b></div>
+    <div class="card">🌿 Fertilizer: {{ fertilizer }} ({{ fert_amount }} kg)</div>
+    <div class="card">💧 Irrigation: {{ irrigation }}</div>
+    <div class="card">📊 Expected Yield: {{ yield_estimate }} tons</div>
+    <div class="card">🌦 Weather: {{ temperature }}°C | {{ humidity }}%</div>
 
-    <!-- Hidden values for Chart -->
-    <div id="chart-data"
-         data-n="{{ N }}"
-         data-p="{{ P }}"
-         data-k="{{ K }}">
-    </div>
+    <canvas id="npkChart"></canvas>
+    <canvas id="forecastChart"></canvas>
+    <canvas id="cropChart"></canvas>
 
-    <!-- Chart -->
-    <canvas id="nutrientChart"></canvas>
+    <div id="map" style="height:300px;"></div>
+
+    <!-- SAFE DATA TRANSFER -->
+    <script id="chart-data"
+        type="application/json"
+        data-npk='{{ [N, P, K] | tojson }}'
+        data-days='{{ days | tojson }}'
+        data-temps='{{ forecast_temps | tojson }}'
+        data-crops='{{ crop_labels | tojson }}'
+        data-counts='{{ crop_counts | tojson }}'
+        data-lat='{{ lat }}'
+        data-lon='{{ lon }}'>
+    </script>
 
     <script>
-        const chartData = document.getElementById("chart-data");
+        const el = document.getElementById("chart-data");
 
-        const N = Number(chartData.dataset.n);
-        const P = Number(chartData.dataset.p);
-        const K = Number(chartData.dataset.k);
+        const npk = JSON.parse(el.dataset.npk);
+        const days = JSON.parse(el.dataset.days);
+        const temps = JSON.parse(el.dataset.temps);
+        const crops = JSON.parse(el.dataset.crops);
+        const counts = JSON.parse(el.dataset.counts);
+        const lat = parseFloat(el.dataset.lat);
+        const lon = parseFloat(el.dataset.lon);
 
-        const ctx = document.getElementById("nutrientChart").getContext("2d");
-
-        new Chart(ctx, {
+        // NPK BAR CHART
+        new Chart(document.getElementById("npkChart"), {
             type: "bar",
             data: {
                 labels: ["Nitrogen", "Phosphorus", "Potassium"],
                 datasets: [{
-                    label: "Soil Nutrient Levels",
-                    data: [N, P, K],
+                    label: "Soil Nutrients",
+                    data: npk,
                     backgroundColor: ["#66bb6a", "#ffa726", "#42a5f5"]
                 }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
             }
         });
+
+        // WEATHER FORECAST LINE CHART
+        new Chart(document.getElementById("forecastChart"), {
+            type: "line",
+            data: {
+                labels: days,
+                datasets: [{
+                    label: "Temperature (°C)",
+                    data: temps,
+                    borderColor: "#ef5350",
+                    fill: false
+                }]
+            }
+        });
+
+        // CROP HISTORY PIE CHART
+        new Chart(document.getElementById("cropChart"), {
+            type: "pie",
+            data: {
+                labels: crops,
+                datasets: [{
+                    data: counts
+                }]
+            }
+        });
+
+        // MAP
+        var map = L.map("map").setView([lat, lon], 10);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+        L.marker([lat, lon]).addTo(map);
     </script>
     {% endif %}
 </div>
