@@ -5,24 +5,21 @@ import requests
 
 app = Flask(__name__)
 
-# ---------------- LOAD MODEL ----------------
+# Load ML model
 model = joblib.load("model/crop_model.pkl")
 
 WEATHER_API_KEY = "72d6c804ff6841bddd44e4f1eecc2e90"
 
-
-# ---------------- LOCATION (IP BASED) ----------------
-def get_location_from_ip():
+# ---------------- GET USER LOCATION (IP BASED) ----------------
+def get_location():
     try:
-        res = requests.get("https://ipinfo.io/json", timeout=5)
-        data = res.json()
-        lat, lon = data["loc"].split(",")
-        return float(lat), float(lon)
+        res = requests.get("https://ipapi.co/json/", timeout=5).json()
+        return res["latitude"], res["longitude"]
     except:
         return None, None
 
 
-# ---------------- LIVE WEATHER ----------------
+# ---------------- GET LIVE WEATHER ----------------
 def get_weather(lat, lon):
     url = "https://api.openweathermap.org/data/2.5/weather"
     params = {
@@ -33,19 +30,12 @@ def get_weather(lat, lon):
     }
 
     try:
-        res = requests.get(url, timeout=5)
-        data = res.json()
-
-        if res.status_code != 200 or "main" not in data:
-            return None, None
-
-        return data["main"]["temp"], data["main"]["humidity"]
-
+        res = requests.get(url, params=params, timeout=5).json()
+        return res["main"]["temp"], res["main"]["humidity"]
     except:
         return None, None
 
 
-# ---------------- ROUTES ----------------
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -54,7 +44,6 @@ def home():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        # -------- FORM DATA --------
         area = float(request.form["area"])
         N = float(request.form["N"])
         P = float(request.form["P"])
@@ -62,21 +51,21 @@ def predict():
         ph = float(request.form["ph"])
         rainfall = float(request.form["rainfall"])
 
-        # -------- LOCATION --------
-        lat, lon = get_location_from_ip()
+        # Location
+        lat, lon = get_location()
         if lat is None:
-            return render_template("index.html", error="❌ Location detection failed")
+            raise Exception("Location error")
 
-        # -------- WEATHER --------
+        # Weather
         temperature, humidity = get_weather(lat, lon)
         if temperature is None:
-            return render_template("index.html", error="❌ Weather API error")
+            raise Exception("Weather error")
 
-        # -------- ML PREDICTION --------
+        # ML Prediction
         features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
         crop = model.predict(features)[0]
 
-        # -------- INSIGHTS --------
+        # Extra insights
         fertilizer = "Nitrogen (Urea)"
         fert_amount = round(area * 50, 2)
         irrigation = "Low irrigation required"
@@ -89,23 +78,19 @@ def predict():
             fert_amount=fert_amount,
             irrigation=irrigation,
             yield_estimate=yield_estimate,
-            temperature=round(temperature, 2),
-            humidity=round(humidity, 2),
+            temperature=temperature,
+            humidity=humidity,
             N=N, P=P, K=K,
             lat=lat,
-            lon=lon,
-
-            # 🔽 placeholders to avoid JS errors
-            days=[],
-            forecast_temps=[],
-            crop_labels=[],
-            crop_counts=[]
+            lon=lon
         )
 
-    except Exception:
-        return render_template("index.html", error="❌ Invalid input")
+    except:
+        return render_template(
+            "index.html",
+            error="❌ Unable to fetch live weather. Please try again."
+        )
 
 
-# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
