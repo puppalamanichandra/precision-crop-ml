@@ -25,7 +25,7 @@
 
     <!-- FORM -->
     <form action="/predict" method="post">
-        <input type="text" name="city" placeholder="City" required>
+
         <input type="number" name="area" placeholder="Farm Area (hectares)" step="any" required>
 
         <input type="number" name="N" placeholder="Nitrogen (N)" step="any" required>
@@ -46,21 +46,15 @@
         <div class="card">📊 <b>Expected Yield:</b> {{ yield_estimate }} tons</div>
         <div class="card">🌦 <b>Weather:</b> {{ temperature }}°C | {{ humidity }}%</div>
 
-        <!-- CHARTS -->
+        <!-- NPK CHART -->
         <canvas id="npkChart"></canvas>
-        <canvas id="forecastChart"></canvas>
-        <canvas id="cropChart"></canvas>
 
         <!-- MAP -->
         <div id="map" style="height:300px; margin-top:20px;"></div>
 
         <!-- SAFE DATA TRANSFER -->
-        <script id="chart-data" type="application/json"
+        <script id="chart-data"
             data-npk='{{ [N, P, K] | tojson }}'
-            data-days='{{ days | tojson }}'
-            data-temps='{{ forecast_temps | tojson }}'
-            data-crops='{{ crop_labels | tojson }}'
-            data-counts='{{ crop_counts | tojson }}'
             data-lat='{{ lat }}'
             data-lon='{{ lon }}'>
         </script>
@@ -69,10 +63,6 @@
             const el = document.getElementById("chart-data");
 
             const npk = JSON.parse(el.dataset.npk);
-            const days = JSON.parse(el.dataset.days);
-            const temps = JSON.parse(el.dataset.temps);
-            const crops = JSON.parse(el.dataset.crops);
-            const counts = JSON.parse(el.dataset.counts);
             const lat = parseFloat(el.dataset.lat);
             const lon = parseFloat(el.dataset.lon);
 
@@ -82,34 +72,9 @@
                 data: {
                     labels: ["Nitrogen", "Phosphorus", "Potassium"],
                     datasets: [{
-                        label: "Soil Nutrients",
+                        label: "Soil Nutrient Levels",
                         data: npk,
                         backgroundColor: ["#66bb6a", "#ffa726", "#42a5f5"]
-                    }]
-                }
-            });
-
-            // WEATHER FORECAST LINE CHART
-            new Chart(document.getElementById("forecastChart"), {
-                type: "line",
-                data: {
-                    labels: days,
-                    datasets: [{
-                        label: "Temperature (°C)",
-                        data: temps,
-                        borderColor: "#ef5350",
-                        fill: false
-                    }]
-                }
-            });
-
-            // CROP HISTORY PIE CHART
-            new Chart(document.getElementById("cropChart"), {
-                type: "pie",
-                data: {
-                    labels: crops,
-                    datasets: [{
-                        data: counts
                     }]
                 }
             });
