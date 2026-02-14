@@ -25,7 +25,6 @@
 
     <!-- FORM -->
     <form action="/predict" method="post">
-
         <input type="number" name="area" placeholder="Farm Area (hectares)" step="any" required>
 
         <input type="number" name="N" placeholder="Nitrogen (N)" step="any" required>
@@ -44,29 +43,28 @@
         <div class="card">🌿 <b>Fertilizer:</b> {{ fertilizer }} ({{ fert_amount }} kg)</div>
         <div class="card">💧 <b>Irrigation:</b> {{ irrigation }}</div>
         <div class="card">📊 <b>Expected Yield:</b> {{ yield_estimate }} tons</div>
-        <div class="card">🌦 <b>Weather:</b> {{ temperature }}°C | {{ humidity }}%</div>
+
+        <div class="card">
+            🌦 <b>Weather:</b> {{ temperature }}°C | {{ humidity }}%
+        </div>
+
+        <!-- ✅ NEW: WEATHER MODE -->
+        <div class="card">
+            🌍 <b>Weather Mode:</b> {{ weather_mode }}
+        </div>
 
         <!-- NPK CHART -->
         <canvas id="npkChart"></canvas>
 
-        <!-- MAP -->
-        <div id="map" style="height:300px; margin-top:20px;"></div>
-
         <!-- SAFE DATA TRANSFER -->
         <script id="chart-data"
-            data-npk='{{ [N, P, K] | tojson }}'
-            data-lat='{{ lat }}'
-            data-lon='{{ lon }}'>
+            data-npk='{{ [N, P, K] | tojson }}'>
         </script>
 
         <script>
             const el = document.getElementById("chart-data");
-
             const npk = JSON.parse(el.dataset.npk);
-            const lat = parseFloat(el.dataset.lat);
-            const lon = parseFloat(el.dataset.lon);
 
-            // NPK BAR CHART
             new Chart(document.getElementById("npkChart"), {
                 type: "bar",
                 data: {
@@ -78,11 +76,6 @@
                     }]
                 }
             });
-
-            // MAP
-            const map = L.map("map").setView([lat, lon], 10);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-            L.marker([lat, lon]).addTo(map);
         </script>
     {% endif %}
 </div>
