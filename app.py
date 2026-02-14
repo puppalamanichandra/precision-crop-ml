@@ -5,69 +5,44 @@ import requests
 
 app = Flask(__name__)
 
-# ---------------- LOAD ML MODEL ----------------
+# ---------------- LOAD MODEL ----------------
 model = joblib.load("model/crop_model.pkl")
 
-# ⚠️ In production, store API key as environment variable
 WEATHER_API_KEY = "72d6c804ff6841bddd44e4f1eecc2e90"
 
-# Store crop history (in-memory)
-crop_history = {}
 
-# ---------------- WEATHER (CURRENT) ----------------
-def get_weather(city):
+# ---------------- LOCATION (IP BASED) ----------------
+def get_location_from_ip():
+    try:
+        res = requests.get("https://ipinfo.io/json", timeout=5)
+        data = res.json()
+        lat, lon = data["loc"].split(",")
+        return float(lat), float(lon)
+    except:
+        return None, None
+
+
+# ---------------- LIVE WEATHER ----------------
+def get_weather(lat, lon):
     url = "https://api.openweathermap.org/data/2.5/weather"
     params = {
-        "q": city,
+        "lat": lat,
+        "lon": lon,
         "appid": WEATHER_API_KEY,
         "units": "metric"
     }
 
     try:
-        response = requests.get(url, timeout=5)
-        data = response.json()
+        res = requests.get(url, timeout=5)
+        data = res.json()
 
-        # Safety check
-        if response.status_code != 200 or "main" not in data:
-            return None
+        if res.status_code != 200 or "main" not in data:
+            return None, None
 
-        return {
-            "temp": data["main"]["temp"],
-            "humidity": data["main"]["humidity"],
-            "lat": data["coord"]["lat"],
-            "lon": data["coord"]["lon"]
-        }
+        return data["main"]["temp"], data["main"]["humidity"]
 
-    except Exception:
-        return None
-
-
-# ---------------- WEATHER (5-DAY FORECAST) ----------------
-def get_forecast(city):
-    url = "https://api.openweathermap.org/data/2.5/forecast"
-    params = {
-        "q": city,
-        "appid": WEATHER_API_KEY,
-        "units": "metric"
-    }
-
-    try:
-        response = requests.get(url, timeout=5)
-        data = response.json()
-
-        if response.status_code != 200 or "list" not in data:
-            return [], []
-
-        days, temps = [], []
-        for item in data["list"]:
-            if "12:00:00" in item["dt_txt"]:
-                days.append(item["dt_txt"].split(" ")[0])
-                temps.append(item["main"]["temp"])
-
-        return days[:5], temps[:5]
-
-    except Exception:
-        return [], []
+    except:
+        return None, None
 
 
 # ---------------- ROUTES ----------------
@@ -79,44 +54,33 @@ def home():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        # Form inputs
-        city = request.form["city"]
+        # -------- FORM DATA --------
         area = float(request.form["area"])
-
         N = float(request.form["N"])
         P = float(request.form["P"])
         K = float(request.form["K"])
         ph = float(request.form["ph"])
         rainfall = float(request.form["rainfall"])
 
-        # Weather data
-        weather = get_weather(city)
-        if weather is None:
-            return render_template(
-                "index.html",
-                error="❌ City not found or Weather API error"
-            )
+        # -------- LOCATION --------
+        lat, lon = get_location_from_ip()
+        if lat is None:
+            return render_template("index.html", error="❌ Location detection failed")
 
-        temperature = weather["temp"]
-        humidity = weather["humidity"]
-        lat = weather["lat"]
-        lon = weather["lon"]
+        # -------- WEATHER --------
+        temperature, humidity = get_weather(lat, lon)
+        if temperature is None:
+            return render_template("index.html", error="❌ Weather API error")
 
-        # Forecast
-        days, forecast_temps = get_forecast(city)
-
-        # ML prediction
+        # -------- ML PREDICTION --------
         features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
         crop = model.predict(features)[0]
 
-        # Extra insights
-        fertilizer = "NPK 20-20-20"
-        fert_amount = round(area * 50, 2)  # kg
-        irrigation = "Moderate irrigation recommended"
-        yield_estimate = round(area * 2.5, 2)  # tons
-
-        # Crop history
-        crop_history[crop] = crop_history.get(crop, 0) + 1
+        # -------- INSIGHTS --------
+        fertilizer = "Nitrogen (Urea)"
+        fert_amount = round(area * 50, 2)
+        irrigation = "Low irrigation required"
+        yield_estimate = round(area * 2.5, 2)
 
         return render_template(
             "index.html",
@@ -125,22 +89,21 @@ def predict():
             fert_amount=fert_amount,
             irrigation=irrigation,
             yield_estimate=yield_estimate,
-            temperature=temperature,
-            humidity=humidity,
+            temperature=round(temperature, 2),
+            humidity=round(humidity, 2),
             N=N, P=P, K=K,
-            days=days,
-            forecast_temps=forecast_temps,
             lat=lat,
             lon=lon,
-            crop_labels=list(crop_history.keys()),
-            crop_counts=list(crop_history.values())
+
+            # 🔽 placeholders to avoid JS errors
+            days=[],
+            forecast_temps=[],
+            crop_labels=[],
+            crop_counts=[]
         )
 
-    except Exception as e:
-        return render_template(
-            "index.html",
-            error="❌ Invalid input or server error"
-        )
+    except Exception:
+        return render_template("index.html", error="❌ Invalid input")
 
 
 # ---------------- RUN ----------------
